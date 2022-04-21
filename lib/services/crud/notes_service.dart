@@ -31,9 +31,20 @@ const createNoteTable = '''CREATE TABLE IF NOT EXISTS "note" (
 class NotesService {
   Database? _db;
 
+  static final NotesService _shared = NotesService._sharedInstance();
+  NotesService._sharedInstance() {
+    _notesStreamControler =
+        StreamController<List<DatabaseNote>>.broadcast(onListen: () {
+      _notesStreamControler.sink.add(_notes);
+    });
+  }
+  factory NotesService() => _shared;
+
   List<DatabaseNote> _notes = [];
-  final _notesStreamControler =
-      StreamController<List<DatabaseNote>>.broadcast();
+
+  late final StreamController<List<DatabaseNote>> _notesStreamControler;
+
+  Stream<List<DatabaseNote>> get allNotes => _notesStreamControler.stream;
 
   Future<void> _cacheNotes() async {
     final allNotes = await getAllNotes();
@@ -56,6 +67,7 @@ class NotesService {
     }
     try {
       final docsPath = await getApplicationDocumentsDirectory();
+
       final dbPath = join(docsPath.path, dbName);
       final db = await openDatabase(dbPath);
       _db = db;
@@ -66,6 +78,12 @@ class NotesService {
     } on MissingPlatformDirectoryException {
       throw UnableToGetDocumentsDirectoryException();
     }
+  }
+
+  Future<void> _ensureDbIsOpen() async {
+    try {
+      await open();
+    } on DatabaseAlreadyOpenException {}
   }
 
   Future<void> close() async {
@@ -79,6 +97,7 @@ class NotesService {
   }
 
   Future<DatabaseUser> createUser({required String email}) async {
+    await _ensureDbIsOpen();
     final db = _getDatabaseOrThrow();
     final results = await db.query(userTable,
         limit: 1, where: 'email = ?', whereArgs: [email.toLowerCase()]);
@@ -97,10 +116,10 @@ class NotesService {
   }
 
   Future<DatabaseUser> getUser({required String email}) async {
+    await _ensureDbIsOpen();
     final db = _getDatabaseOrThrow();
     final results = await db.query(userTable,
         limit: 1, where: 'email = ?', whereArgs: [email.toLowerCase()]);
-
     if (results.isEmpty) {
       throw CouldNotFindUserException();
     } else {
@@ -109,6 +128,7 @@ class NotesService {
   }
 
   Future<void> deleteUser({required String email}) async {
+    await _ensureDbIsOpen();
     final db = _getDatabaseOrThrow();
     final deletedCount = await db.delete(userTable,
         where: 'email = ?', whereArgs: [email.toLowerCase()]);
@@ -119,6 +139,7 @@ class NotesService {
   }
 
   Future<DatabaseNote> createNote({required DatabaseUser owner}) async {
+    await _ensureDbIsOpen();
     final db = _getDatabaseOrThrow();
     final dbUser = await getUser(email: owner.email);
     if (dbUser != owner) {
@@ -143,6 +164,7 @@ class NotesService {
   }
 
   Future<DatabaseNote> getNote({required int id}) async {
+    await _ensureDbIsOpen();
     final db = _getDatabaseOrThrow();
     final notes = await db.query(
       noteTable,
@@ -165,14 +187,18 @@ class NotesService {
   }
 
   Future<Iterable<DatabaseNote>> getAllNotes() async {
+    await _ensureDbIsOpen();
     final db = _getDatabaseOrThrow();
     final notes = await db.query(noteTable);
 
     return notes.map((noteRow) => DatabaseNote.fromRow(noteRow));
   }
 
-  Future<DatabaseNote> updateNote(
-      {required DatabaseNote note, required String text}) async {
+  Future<DatabaseNote> updateNote({
+    required DatabaseNote note,
+    required String text,
+  }) async {
+    await _ensureDbIsOpen();
     final db = _getDatabaseOrThrow();
     await getNote(id: note.id);
 
@@ -193,6 +219,7 @@ class NotesService {
   }
 
   Future<void> deleteNote({required int id}) async {
+    await _ensureDbIsOpen();
     final db = _getDatabaseOrThrow();
     final deletedCount = await db.delete(
       noteTable,
@@ -209,6 +236,7 @@ class NotesService {
   }
 
   Future<int> deleteAllNotes() async {
+    await _ensureDbIsOpen();
     final db = _getDatabaseOrThrow();
     final numberOfDeletions = await db.delete(noteTable);
     _notes = [];
