@@ -60,7 +60,8 @@ class DefaultFirebaseOptions {
     messagingSenderId: '1021062469377',
     projectId: 'mynotes-cd6ac',
     storageBucket: 'mynotes-cd6ac.appspot.com',
-    iosClientId: '1021062469377-rev4je81gr8thkg6gk1242tjq2rmoeu3.apps.googleusercontent.com',
+    iosClientId:
+        '1021062469377-rev4je81gr8thkg6gk1242tjq2rmoeu3.apps.googleusercontent.com',
     iosBundleId: 'com.tasbe7na.mynotes',
   );
 }
